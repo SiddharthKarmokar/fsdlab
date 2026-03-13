@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Complaint System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logout-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            float: right;
+            margin-bottom: 20px;
+        }
+        .logout-btn:hover {
+            background-color: #c82333;
+        }
+        .complaints-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .complaints-table th,
+        .complaints-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        .complaints-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .complaints-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .status-select {
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .priority-high {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .priority-medium {
+            color: #ffc107;
+            font-weight: bold;
+        }
+        .priority-low {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .status-pending {
+            color: #6c757d;
+        }
+        .status-in-progress {
+            color: #007bff;
+        }
+        .status-resolved {
+            color: #28a745;
+        }
+        .error {
+            color: red;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .success {
+            color: green;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .back-link a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .description {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .description:hover {
+            white-space: normal;
+            word-wrap: break-word;
+        }
+        .updates {
+            font-size: 12px;
+            color: #666;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Admin Panel - Complaint Management</h1>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+        
+        <div id="message"></div>
+        <div id="loading" class="loading">Loading complaints...</div>
+        
+        <table class="complaints-table" id="complaintsTable" style="display: none;">
+            <thead>
+                <tr>
+                    <th>Complaint ID</th>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>User</th>
+                    <th>Description</th>
+                    <th>Updates</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="complaintsBody">
+            </tbody>
+        </table>
+
+        <div class="back-link">
+            <a href="index.html">Back to Home</a>
+        </div>
+    </div>
+
+    <script>
+        // Check if user is logged in
+        const token = localStorage.getItem('token');
+
+        if (!token) {
+            window.location.href = 'login.html';
+        }
+
+        // Logout function
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+
+        // Load complaints
+        async function loadComplaints() {
+            try {
+                const response = await fetch('/complaints', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const complaints = await response.json();
+                    displayComplaints(complaints);
+                } else {
+                    showMessage('Failed to load complaints', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error. Please try again.', 'error');
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        // Display complaints in table
+        function displayComplaints(complaints) {
+            const tbody = document.getElementById('complaintsBody');
+            tbody.innerHTML = '';
+
+            complaints.forEach(complaint => {
+                const row = document.createElement('tr');
+                
+                const priorityClass = `priority-${complaint.priority.toLowerCase()}`;
+                const statusClass = `status-${complaint.status.toLowerCase().replace(' ', '-')}`;
+                
+                const updatesHtml = complaint.updates.map(update => 
+                    `${update.date}: ${update.status}`
+                ).join('<br>');
+
+                row.innerHTML = `
+                    <td>${complaint.complaint_id}</td>
+                    <td>${complaint.title}</td>
+                    <td>${complaint.category}</td>
+                    <td class="${priorityClass}">${complaint.priority}</td>
+                    <td class="${statusClass}">${complaint.status}</td>
+                    <td>${complaint.user_name}<br><small>${complaint.user_email}</small></td>
+                    <td class="description" title="${complaint.description}">${complaint.description}</td>
+                    <td class="updates">${updatesHtml}</td>
+                    <td>
+                        <select class="status-select" onchange="updateStatus(${complaint.complaint_id}, this.value)">
+                            <option value="Pending" ${complaint.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                            <option value="In Progress" ${complaint.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                            <option value="Resolved" ${complaint.status === 'Resolved' ? 'selected' : ''}>Resolved</option>
+                        </select>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+
+            document.getElementById('complaintsTable').style.display = 'table';
+        }
+
+        // Update complaint status
+        async function updateStatus(complaintId, newStatus) {
+            try {
+                const response = await fetch('/complaint/status', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        complaintId: complaintId,
+                        status: newStatus
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('Status updated successfully!', 'success');
+                    // Reload complaints to show updated data
+                    setTimeout(() => {
+                        loadComplaints();
+                    }, 1000);
+                } else {
+                    showMessage(data.error || 'Failed to update status', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error. Please try again.', 'error');
+            }
+        }
+
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.className = type;
+            messageDiv.textContent = message;
+            
+            // Clear message after 5 seconds
+            setTimeout(() => {
+                messageDiv.textContent = '';
+                messageDiv.className = '';
+            }, 5000);
+        }
+
+        // Load complaints when page loads
+        loadComplaints();
+    </script>
+</body>
+</html>

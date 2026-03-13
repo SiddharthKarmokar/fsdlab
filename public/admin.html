@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header class="header">
+        <a href="/" class="logo">📋 Complaint Tracker</a>
+        <div class="user-info"><span id="userName">Admin</span><button class="btn-logout" onclick="logout()">Logout</button></div>
+    </header>
+    <div class="container">
+        <div class="dashboard-header"><h1>Admin Dashboard</h1><a href="/dashboard" class="btn btn-secondary">My Complaints</a></div>
+        <div class="stats-grid" id="stats"></div>
+        <div id="msg"></div>
+        <div class="card"><h2>All Complaints</h2><div class="complaint-list" id="list"></div></div>
+    </div>
+    <div class="modal" id="viewModal">
+        <div class="modal-content">
+            <div class="modal-header"><h2>Details</h2><button class="close-btn" onclick="document.getElementById('viewModal').classList.remove('active')">×</button></div>
+            <div id="details"></div>
+        </div>
+    </div>
+    <div class="modal" id="updateModal">
+        <div class="modal-content">
+            <div class="modal-header"><h2>Update Status</h2><button class="close-btn" onclick="document.getElementById('updateModal').classList.remove('active')">×</button></div>
+            <form id="upForm">
+                <input type="hidden" id="upId">
+                <div class="form-group"><label>New Status</label><select id="newStatus"><option>Pending</option><option>In Progress</option><option>Resolved</option></select></div>
+                <button type="submit" class="btn" style="width:100%">Update</button>
+            </form>
+        </div>
+    </div>
+    <script src="js/main.js"></script>
+    <script>
+        async function init() {
+            const res = await fetch('/api/user');
+            if (!res.ok) return window.location.href = '/login';
+            const user = (await res.json()).user;
+            if (!user.isAdmin) return window.location.href = '/dashboard';
+            document.getElementById('userName').textContent = 'Admin: ' + user.name;
+            load();
+        }
+        async function load() {
+            const res = await fetch('/api/complaints');
+            const data = await res.json();
+            if (!data.success) return;
+            const c = data.complaints;
+            document.getElementById('stats').innerHTML = `<div class="stat-card"><h3>${c.length}</h3><p>Total</p></div><div class="stat-card"><h3>${c.filter(x=>x.status==='Pending').length}</h3><p>Pending</p></div><div class="stat-card"><h3>${c.filter(x=>x.status==='In Progress').length}</h3><p>In Progress</p></div><div class="stat-card"><h3>${c.filter(x=>x.status==='Resolved').length}</h3><p>Resolved</p></div>`;
+            document.getElementById('list').innerHTML = c.map(x => `<div class="complaint-item"><div class="complaint-header"><div><div class="complaint-title">${x.title}</div><div class="complaint-id">#${x.complaint_id} • ${new Date(x.created_at).toLocaleDateString()} • ${x.u_name}</div></div><span class="status-badge status-${x.status.toLowerCase().replace(' ','-')}">${x.status}</span></div><div class="complaint-meta"><span><strong>Category:</strong> ${x.category}</span><span><strong>Priority:</strong> <span class="priority-${x.priority.toLowerCase()}">${x.priority}</span></span><span><strong>User:</strong> ${x.u_name}</span></div><div class="complaint-actions"><button class="btn btn-secondary" onclick="view(${x.complaint_id})">View</button><button class="btn btn-warning" onclick="showUpdate(${x.complaint_id},'${x.status}')">Update</button></div></div>`).join('') || '<div class="empty-state" style="color:#666"><h3>No complaints</h3></div>';
+        }
+        async function view(id) {
+            const res = await fetch('/api/complaint/' + id);
+            const data = await res.json();
+            if (!data.success) return;
+            const c = data.complaint, u = c.updates ? c.updates.map(x => `<div class="update-item"><span class="update-date">${x.date}</span><span class="update-status">${x.status}</span></div>`).join('') : '';
+            document.getElementById('details').innerHTML = `<p><strong>Title:</strong> ${c.title}</p><p><strong>User:</strong> ${c.u_name} (${c.u_email})</p><p><strong>Category:</strong> ${c.category}</p><p><strong>Priority:</strong> ${c.priority}</p><p><strong>Status:</strong> ${c.status}</p><p><strong>Description:</strong> ${c.description || 'N/A'}</p><div class="updates-timeline"><h4>History</h4>${u}</div>`;
+            document.getElementById('viewModal').classList.add('active');
+        }
+        function showUpdate(id, status) { document.getElementById('upId').value = id; document.getElementById('newStatus').value = status; document.getElementById('updateModal').classList.add('active'); }
+        document.getElementById('upForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const res = await fetch('/api/complaint/status', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ complaintId: parseInt(upId.value), status: newStatus.value }) });
+            const data = await res.json();
+            if (data.success) { document.getElementById('updateModal').classList.remove('active'); load(); msg.innerHTML = '<div class="alert alert-success">Updated!</div>'; }
+        };
+        init();
+    </script>
+</body>
+</html>

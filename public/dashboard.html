@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Complaints</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header class="header">
+        <a href="/" class="logo">📋 Complaint Tracker</a>
+        <div class="user-info"><span id="userName">User</span><button class="btn-logout" onclick="logout()">Logout</button></div>
+    </header>
+    <div class="container">
+        <div class="dashboard-header"><h1>My Complaints</h1><button class="btn btn-success" onclick="showModal()">+ New Complaint</button></div>
+        <div class="stats-grid" id="stats"></div>
+        <div id="msg"></div>
+        <div class="complaint-list" id="list"></div>
+    </div>
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h2>New Complaint</h2><button class="close-btn" onclick="closeModal()">×</button></div>
+            <form id="compForm">
+                <div class="form-group"><label>Title</label><input type="text" id="title" required></div>
+                <div class="form-group"><label>Category</label><select id="category" required><option value="">Select</option><option>Infrastructure</option><option>Internet</option><option>Electricity</option><option>Water</option><option>Security</option><option>Other</option></select></div>
+                <div class="form-group"><label>Priority</label><select id="priority" required><option>Low</option><option>Medium</option><option>High</option></select></div>
+                <div class="form-group"><label>Description</label><textarea id="description" required></textarea></div>
+                <button type="submit" class="btn" style="width:100%">Submit</button>
+            </form>
+        </div>
+    </div>
+    <div class="modal" id="viewModal">
+        <div class="modal-content">
+            <div class="modal-header"><h2>Details</h2><button class="close-btn" onclick="document.getElementById('viewModal').classList.remove('active')">×</button></div>
+            <div id="details"></div>
+        </div>
+    </div>
+    <script src="js/main.js"></script>
+    <script>
+        async function init() {
+            const res = await fetch('/api/user');
+            if (!res.ok) return window.location.href = '/login';
+            const user = (await res.json()).user;
+            document.getElementById('userName').textContent = user.name;
+            load();
+        }
+        async function load() {
+            const res = await fetch('/api/complaints');
+            const data = await res.json();
+            if (!data.success) return;
+            const c = data.complaints;
+            document.getElementById('stats').innerHTML = `<div class="stat-card"><h3>${c.length}</h3><p>Total</p></div><div class="stat-card"><h3>${c.filter(x=>x.status==='Pending').length}</h3><p>Pending</p></div><div class="stat-card"><h3>${c.filter(x=>x.status==='In Progress').length}</h3><p>In Progress</p></div><div class="stat-card"><h3>${c.filter(x=>x.status==='Resolved').length}</h3><p>Resolved</p></div>`;
+            document.getElementById('list').innerHTML = c.map(x => `<div class="complaint-item"><div class="complaint-header"><div><div class="complaint-title">${x.title}</div><div class="complaint-id">#${x.complaint_id} • ${new Date(x.created_at).toLocaleDateString()}</div></div><span class="status-badge status-${x.status.toLowerCase().replace(' ','-')}">${x.status}</span></div><div class="complaint-meta"><span><strong>Category:</strong> ${x.category}</span><span><strong>Priority:</strong> <span class="priority-${x.priority.toLowerCase()}">${x.priority}</span></span></div><div class="complaint-actions"><button class="btn btn-secondary" onclick="view(${x.complaint_id})">View</button></div></div>`).join('') || '<div class="empty-state" style="color:#666"><h3>No complaints</h3></div>';
+        }
+        function showModal() { document.getElementById('modal').classList.add('active'); }
+        function closeModal() { document.getElementById('modal').classList.remove('active'); document.getElementById('compForm').reset(); }
+        document.getElementById('compForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const res = await fetch('/api/complaint', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title.value, category: category.value, priority: priority.value, description: description.value }) });
+            const data = await res.json();
+            if (data.success) { closeModal(); load(); msg.innerHTML = '<div class="alert alert-success">Submitted!</div>'; }
+        };
+        async function view(id) {
+            const res = await fetch('/api/complaint/' + id);
+            const data = await res.json();
+            if (!data.success) return;
+            const c = data.complaint, u = c.updates ? c.updates.map(x => `<div class="update-item"><span class="update-date">${x.date}</span><span class="update-status">${x.status}</span></div>`).join('') : '';
+            document.getElementById('details').innerHTML = `<p><strong>Title:</strong> ${c.title}</p><p><strong>Category:</strong> ${c.category}</p><p><strong>Priority:</strong> ${c.priority}</p><p><strong>Status:</strong> ${c.status}</p><p><strong>Description:</strong> ${c.description || 'N/A'}</p><div class="updates-timeline"><h4>History</h4>${u}</div>`;
+            document.getElementById('viewModal').classList.add('active');
+        }
+        init();
+    </script>
+</body>
+</html>

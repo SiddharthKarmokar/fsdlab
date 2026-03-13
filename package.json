@@ -1,0 +1,18 @@
+{
+  "name": "complaint-tracking-system",
+  "version": "1.0.0",
+  "description": "Online Complaint/Issue Tracking System with MySQL and MongoDB",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "mongodb": "^6.3.0",
+    "mysql2": "^3.6.5"
+  }
+}

@@ -2,32 +2,33 @@ const express = require('express');
 const session = require('express-session');
 const mysql = require('mysql2/promise');
 const { MongoClient } = require('mongodb');
+require('dotenv').config();
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
-app.use(session({ secret: 'secret', resave: false, saveUninitialized: false }));
+app.use(session({ secret: process.env.SESSION_SECRET || 'secret', resave: false, saveUninitialized: false }));
 
 let mysqlPool, mongoDb, logsCol;
 
 async function initDB() {
     try {
-        const conn = await mysql.createConnection({ host: 'localhost', user: 'root', password: '', database: 'complaint_tracking' });
-        await conn.query('CREATE DATABASE IF NOT EXISTS complaint_tracking');
+        const conn = await mysql.createConnection({ host: process.env.MYSQL_HOST, user: process.env.MYSQL_USER, password: process.env.MYSQL_PASSWORD, database: process.env.MYSQL_DATABASE });
+        await conn.query('CREATE DATABASE IF NOT EXISTS ' + process.env.MYSQL_DATABASE);
         await conn.end();
-        mysqlPool = mysql.createPool({ host: 'localhost', user: 'root', password: '', database: 'complaint_tracking', connectionLimit: 5 });
+        mysqlPool = mysql.createPool({ host: process.env.MYSQL_HOST, user: process.env.MYSQL_USER, password: process.env.MYSQL_PASSWORD, database: process.env.MYSQL_DATABASE, connectionLimit: 5 });
         
         await mysqlPool.execute('CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100), email VARCHAR(100) UNIQUE, phone VARCHAR(20), password VARCHAR(100), is_admin TINYINT DEFAULT 0)');
         await mysqlPool.execute('CREATE TABLE IF NOT EXISTS complaints (complaint_id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, title VARCHAR(200), category VARCHAR(50), priority VARCHAR(20), status VARCHAR(20) DEFAULT "Pending", created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(user_id) REFERENCES users(id))');
         
         const [admins] = await mysqlPool.execute('SELECT * FROM users WHERE is_admin = 1');
-        if (!admins.length) await mysqlPool.execute("INSERT INTO users VALUES (1, 'Admin', 'admin@system.com', '1234567890', 'admin123', 1, NOW())");
+        if (!admins.length) await mysqlPool.execute("INSERT INTO users (id, name, email, phone, password, is_admin) VALUES (1, 'Admin', 'admin@system.com', '1234567890', 'admin123', 1)");
         
-        const mongoClient = new MongoClient('mongodb://localhost:27017');
+        const mongoClient = new MongoClient(process.env.MONGO_URI);
         await mongoClient.connect();
-        mongoDb = mongoClient.db('complaint_tracking');
+        mongoDb = mongoClient.db(process.env.MONGO_DATABASE);
         logsCol = mongoDb.collection('complaint_logs');
         console.log('MySQL & MongoDB ready');
     } catch (e) { console.error('DB Error:', e.message); }
